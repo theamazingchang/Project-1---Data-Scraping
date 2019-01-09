@@ -1,0 +1,131 @@
+---
+title: "Data Scraping"
+author: "Alex Chang"
+date: "January 8, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+We will need to start by loading up a necessary R package called "rvest"
+```{r}
+library(rvest)
+```
+Now let's take the top grossing movies in the US box office ranked 1-50 from imdb and specify what needs to be scraped
+
+```{r}
+url <- 'https://www.imdb.com/search/title?title_type=feature&release_date=2018-01-01,2018-12-31&genres=action&sort=boxoffice_gross_us,desc'
+```
+
+Let's read in the html code from that url 
+```{r}
+webpage <- read_html(url)
+```
+
+Using the web selector tool from chrome, we selected a portion of CSS code that describes the rank of each movie 
+
+```{r}
+rank_data_html <- html_nodes(webpage,'.text-primary')
+```
+
+Now let's convert it into text 
+```{r}
+rank_data <- html_text(rank_data_html)
+#let's check if that conversion worked 
+head(rank_data)
+```
+
+Seems to work just fine.  However it is currently recognized by R as a text data and not numerical data, meaning it reads the numbers like letters rather than numbers. You can tell by how R spits out the string of number that have quotation marks.  I'm sure we've all experienced this nuance in excel at one point in our lives before, so let's perform the conversion. 
+
+```{r}
+rank_data<-as.numeric(rank_data)
+#now let's check it again 
+head(rank_data)
+```
+
+We're going to repeat the same for the titles of each film.  This time I'm goign to chunk all of the code rather than break it out like I have beforehand.  
+
+```{r}
+#Titles 
+title_data_html <- html_nodes(webpage,'.lister-item-header a')
+title_data <- html_text(title_data_html)
+head(title_data)
+
+#Descriptions 
+description_data_html <- html_nodes(webpage,'.ratings-bar+ .text-muted')
+description_data <- html_text(description_data_html)
+head(description_data)
+description_data<-gsub("\n","",description_data)
+head(description_data)
+
+#Runtime
+runtime_data_html <- html_nodes(webpage,'.runtime')
+runtime_data <- html_text(runtime_data_html)
+head(runtime_data)
+runtime_data<-gsub(" min","",runtime_data)
+head(runtime_data)
+runtime_data<-as.numeric(runtime_data)
+
+#Genre
+genre_data_html <- html_nodes(webpage,'.genre')
+genre_data <- html_text(genre_data_html)
+head(genre_data)
+genre_data<-gsub("\n","",genre_data)
+genre_data<-gsub(" ","",genre_data)
+#taking only the first genre of each movie
+genre_data<-gsub(",.*","",genre_data)
+#Convering each genre from text to factor
+genre_data<-as.factor(genre_data)
+head(genre_data)
+
+#Ratings
+rating_data_html <- html_nodes(webpage,'.ratings-imdb-rating strong')
+rating_data <- html_text(rating_data_html)
+head(rating_data)
+rating_data<-as.numeric(rating_data)
+
+#Votes 
+votes_data_html <- html_nodes(webpage,'.sort-num_votes-visible span:nth-child(2)')
+votes_data <- html_text(votes_data_html)
+head(votes_data)
+votes_data<-gsub(",","",votes_data)
+head(votes_data)
+votes_data<-as.numeric(votes_data)
+
+#Metascore
+metascore_data_html <- html_nodes(webpage,'.ratings-metascore')
+metascore_data <- html_text(metascore_data_html)
+metascore_data<-gsub(" ","",metascore_data)
+metascore_data<-gsub("\n","",metascore_data)
+metascore_data<-gsub("Metascore","",metascore_data)
+metascore_data<-as.numeric(metascore_data)
+head(metascore_data)
+```
+
+Okay, looks like I got all the variables I need, let's make all of these into one coherent data set.  
+
+```{r}
+movies_df<-data.frame(Rank = rank_data, Title = title_data,
+
+Description = description_data, Runtime = runtime_data,
+
+Genre = genre_data, Rating = rating_data, Votes = votes_data)                                                         
+```
+
+Let's check the strucutre of this wonderful dataset, or as R calls it "dataframe"
+
+```{r}
+str(movies_df)
+```
+
+All that's left is for some analysis.  I'll just keep it really simple and compare rating vs rank.  
+
+```{r}
+library(ggplot2)
+ggplot(movies_df,aes(x=Rank,y=Rating))+ geom_point(aes(size=Rating,col=Genre))
+```
+
+
+My next project will utilize the description text to create a word graph on what words are most used.  
